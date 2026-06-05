@@ -18,6 +18,9 @@
   const fsIconExit = $('#fullscreen-icon-exit');
   const imageWrap = $('.reader-image-wrap');
   const controlEls = ['.reader-controls', '.reader-navigation', '.reader-hints'].map($);
+  const zoomInBtn = $('#zoom-in');
+  const zoomOutBtn = $('#zoom-out');
+  const zoomLevelEl = $('#zoom-level');
 
   const comicUuid = reader.dataset.comicUuid;
   const pageCount = parseInt(reader.dataset.pageCount, 10) || 1;
@@ -28,6 +31,60 @@
   let progressTimer = null;
   let hideTimer = null;
   let lastTouchEnd = 0;
+
+  // --- Zoom ---
+
+  const ZOOM_LEVELS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
+  const ZOOM_DEFAULT = 2; // index of 1.0
+  let zoomIdx = ZOOM_DEFAULT;
+
+  let zoomBaseW = 0;
+  let zoomBaseH = 0;
+
+  const applyZoom = () => {
+    const z = ZOOM_LEVELS[zoomIdx];
+
+    if (z === 1) {
+      img.style.width = '';
+      img.style.height = '';
+      img.style.maxWidth = '';
+      img.style.maxHeight = '';
+      imageWrap.style.overflow = '';
+      imageWrap.style.alignItems = '';
+      imageWrap.style.justifyContent = '';
+      zoomBaseW = 0;
+      zoomBaseH = 0;
+    } else {
+      if (!zoomBaseW) {
+        zoomBaseW = img.offsetWidth;
+        zoomBaseH = img.offsetHeight;
+      }
+      img.style.width = `${zoomBaseW * z}px`;
+      img.style.height = `${zoomBaseH * z}px`;
+      img.style.maxWidth = 'none';
+      img.style.maxHeight = 'none';
+      if (z > 1) {
+        imageWrap.style.overflow = 'auto';
+        imageWrap.style.alignItems = 'flex-start';
+        imageWrap.style.justifyContent = 'flex-start';
+      } else {
+        imageWrap.style.overflow = '';
+        imageWrap.style.alignItems = '';
+        imageWrap.style.justifyContent = '';
+      }
+    }
+
+    if (zoomLevelEl) zoomLevelEl.textContent = `${Math.round(z * 100)}%`;
+    if (zoomOutBtn) zoomOutBtn.disabled = zoomIdx === 0;
+    if (zoomInBtn) zoomInBtn.disabled = zoomIdx === ZOOM_LEVELS.length - 1;
+  };
+
+  const zoomIn = () => { if (zoomIdx < ZOOM_LEVELS.length - 1) { zoomIdx++; applyZoom(); } };
+  const zoomOut = () => { if (zoomIdx > 0) { zoomIdx--; applyZoom(); } };
+  const resetZoom = () => { zoomIdx = ZOOM_DEFAULT; applyZoom(); };
+
+  zoomInBtn?.addEventListener('click', zoomIn);
+  zoomOutBtn?.addEventListener('click', zoomOut);
 
   // --- Helpers ---
 
@@ -60,7 +117,7 @@
       loading = false;
     };
 
-    preload.onload = () => { img.src = url; img.alt = `Page ${page}`; done(); };
+    preload.onload = () => { img.src = url; img.alt = `Page ${page}`; zoomBaseW = 0; zoomBaseH = 0; done(); };
     preload.onerror = done;
     preload.src = url;
 
@@ -156,6 +213,10 @@
       ArrowRight: () => navigate(1),
       f: toggleFullscreen,
       F: toggleFullscreen,
+      '+': zoomIn,
+      '=': zoomIn,
+      '-': zoomOut,
+      '0': resetZoom,
     };
     if (actions[e.key]) { e.preventDefault(); actions[e.key](); }
   });
